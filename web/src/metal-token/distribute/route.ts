@@ -1,0 +1,28 @@
+import { NextResponse } from 'next/server'
+import { DistributeTokenSchema } from '../types'
+import { METAL_API_BASE_URL, METAL_API_HEADERS, handleMetalResponse } from '../metal-config'
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+    const validatedData = DistributeTokenSchema.parse(body)
+
+    const response = await fetch(`${METAL_API_BASE_URL}/token/${validatedData.tokenAddress}/distribute`, {
+      method: 'POST',
+      headers: METAL_API_HEADERS,
+      body: JSON.stringify({
+        userId: validatedData.userId,
+        amount: validatedData.amount
+      })
+    })
+
+    const data = await handleMetalResponse(response)
+    return NextResponse.json({ success: true, data })
+  } catch (error) {
+    console.error('Distribute token error:', error)
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Failed to distribute tokens' },
+      { status: 400 }
+    )
+  }
+} 

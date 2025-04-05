@@ -25,6 +25,7 @@ contract Investment {
         string name;                        // Name of the project
         string description;                 // Description of the project
         uint256 totalTokenCirculation;      // Total tokens available for distribution
+        uint256 totalFundingGoal;     
         uint256 amountRaised;               // Total ETH raised across all phases
         address founder;                    // Address of the project founder
         ProjectPhase[] projectPhases;       // Array of funding phases
@@ -77,12 +78,14 @@ contract Investment {
      */
     function createProject(
         string memory projectId,
-        string memory _name,
+        string memory _name, 
         string memory _description,
         uint256 _totalTokenCirculation,
         uint256[] memory _phaseFundingGoals,
-        uint256[] memory _phaseDeadlines
+        uint256[] memory _phaseDeadlines,
+        uint256 _totalFundingGoal
     ) public {
+        
         require(_phaseFundingGoals.length == _phaseDeadlines.length, "Mismatched phase data");
         require(_phaseFundingGoals.length > 0, "At least one phase required");
 
@@ -96,6 +99,7 @@ contract Investment {
         newProject.isActive = true;
         newProject.currentPhase = 0;
         newProject.allPhasesCompleted = false;
+        newProject.totalFundingGoal = _totalFundingGoal;
 
         for (uint256 i = 0; i < _phaseFundingGoals.length; i++) {
             newProject.projectPhases.push(
@@ -172,7 +176,8 @@ contract Investment {
         address,
         bool,
         uint256,
-        bool
+        bool,
+        uint256
     ) {
         StartUpProject storage project = findProject(projectsByFounder[founder], projectId);
         return (
@@ -184,7 +189,8 @@ contract Investment {
             project.founder,
             project.isActive,
             project.currentPhase,
-            project.allPhasesCompleted
+            project.allPhasesCompleted,
+            project.totalFundingGoal
         );
     }
 

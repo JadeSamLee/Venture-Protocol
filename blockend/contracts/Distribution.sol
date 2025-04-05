@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 /**
  * @title IERC20
- * @dev Interface for the ERC-20 token standard used for distribution.
+ * @dev Interface for the ERC-20 token standard used for project token distribution.
  */
 interface IERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool);
@@ -26,7 +26,8 @@ interface IInvestment {
         address founder,
         bool isActive,
         uint256 currentPhase,
-        bool allPhasesCompleted
+        bool allPhasesCompleted,
+        uint256 totalFundingGoal
     );
     function findInvestor(address founder, string memory projectId, address investor) external view returns (uint256);
 }
@@ -47,7 +48,7 @@ interface IEscrow {
 contract Distribution {
     // State Variables
 
-    IERC20 public token;                // ERC-20 token contract for distribution
+    IERC20 public token;                // ERC-20 token contract for project token distribution
     address public platformAddress;     // Address receiving platform tokens
     IInvestment public investment;      // Address of the Investment contract
     IEscrow public escrow;              // Address of the Escrow contract
@@ -58,12 +59,25 @@ contract Distribution {
 
     // Events
 
+    /**
+     * @dev Emitted when tokens are distributed to a recipient.
+     * @param projectId Unique identifier of the project.
+     * @param recipient Address receiving the tokens.
+     * @param amount Amount of tokens distributed.
+     */
     event TokensDistributed(string projectId, address recipient, uint256 amount);
+
+    /**
+     * @dev Emitted when rewards are distributed to an investor.
+     * @param projectId Unique identifier of the project.
+     * @param investor Address of the investor.
+     * @param reward Amount of tokens rewarded.
+     */
     event RewardsDistributed(string projectId, address investor, uint256 reward);
 
     /**
      * @dev Constructor to initialize the Distribution contract.
-     * @param _token Address of the ERC-20 token contract.
+     * @param _token Address of the ERC-20 token contract for project tokens.
      * @param _platformAddress Address receiving platform tokens.
      * @param _investment Address of the Investment contract.
      * @param _escrow Address of the Escrow contract.
@@ -76,7 +90,7 @@ contract Distribution {
     }
 
     /**
-     * @dev Distributes tokens to the founder, platform, and investors, and releases funds from escrow.
+     * @dev Distributes project tokens to the founder, platform, and investors, and releases funds from Escrow.
      * @param founder Address of the project founder.
      * @param projectId ID of the project.
      */
@@ -91,7 +105,8 @@ contract Distribution {
             address projectFounder,
             bool isActive,
             ,
-            bool allPhasesCompleted
+            bool allPhasesCompleted,
+            uint256 totalFundingGoal
         ) = investment.getProject(founder, projectId);
 
         require(allPhasesCompleted, "Not all phases completed");
@@ -116,15 +131,12 @@ contract Distribution {
         // Release funds from escrow to founder
         escrow.release(founder, projectId, projectFounder);
 
-        // Simplified investor distribution (assumes caller is an investor)
+        // Simplified investor distribution
         uint256 investorStake = investment.findInvestor(founder, projectId, msg.sender);
         if (investorStake > 0) {
             uint256 investorReward = (investorTokens * investorStake) / totalStaked;
             require(token.transfer(msg.sender, investorReward), "Investor token transfer failed");
             emit RewardsDistributed(projectId, msg.sender, investorReward);
-            // Note: Investor stakes are not reset here; must be handled in Investment if needed
         }
-
-    
     }
 }

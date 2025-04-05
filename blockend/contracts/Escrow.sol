@@ -14,8 +14,31 @@ contract Escrow {
 
     // Events
 
+    /**
+     * @dev Emitted when ETH is deposited into escrow.
+     * @param founder Address of the project founder.
+     * @param projectId Unique identifier of the project.
+     * @param investor Address of the investor.
+     * @param amount Amount of ETH deposited.
+     */
     event Deposited(address indexed founder, string projectId, address investor, uint256 amount);
+
+    /**
+     * @dev Emitted when funds are released from escrow.
+     * @param founder Address of the project founder.
+     * @param projectId Unique identifier of the project.
+     * @param recipient Address receiving the funds.
+     * @param amount Amount of ETH released.
+     */
     event Released(address indexed founder, string projectId, address recipient, uint256 amount);
+
+    /**
+     * @dev Emitted when an investor is refunded.
+     * @param founder Address of the project founder.
+     * @param projectId Unique identifier of the project.
+     * @param investor Address of the investor.
+     * @param amount Amount of ETH refunded.
+     */
     event Refunded(address indexed founder, string projectId, address investor, uint256 amount);
 
     /**

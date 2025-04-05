@@ -11,8 +11,7 @@ const NODIT_API_BASE = "https://api.nodit.io/v1";
 const CONTRACT_ADDRESSES = {
   distribution: "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8",
   escrow: "0xd9145CCE52D386f254917e481eB44e9943F39138",
-  investment: "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8", // Note: Same as distribution
-};
+  investment: "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8",
 
 // Chain ID (e.g., 1 for Ethereum Mainnet, adjust as needed)
 const CHAIN_ID = 1;

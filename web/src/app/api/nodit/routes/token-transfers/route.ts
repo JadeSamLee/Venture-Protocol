@@ -1,124 +1,105 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { NoditAPI, formatAddress } from '../../index';
+import { NextRequest, NextResponse } from "next/server";
+import axios from "axios";
 
-/**
- * GET handler for token transfers endpoint
- * Fetches token transfer history for an account or contract
- * with enhanced metadata including token details
- * @param request NextRequest object
- * @returns NextResponse with token transfer data
- */
-export async function GET(request: NextRequest) {
+// Your Nodit API key (store this in environment variables in production)
+const NODIT_API_KEY = process.env.NODIT_API_KEY || "your_nodit_api_key_here";
+
+// Base URL for Nodit API
+const NODIT_API_BASE = "https://api.nodit.io/v1";
+
+// Your contract addresses
+const CONTRACT_ADDRESSES = {
+  distribution: "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8",
+  escrow: "0xd9145CCE52D386f254917e481eB44e9943F39138",
+  investment: "0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8", // Note: Same as distribution
+};
+
+// Chain ID (e.g., 1 for Ethereum Mainnet, adjust as needed)
+const CHAIN_ID = 1;
+
+// GET: Fetch token contract metadata
+export async function GET(req: NextRequest) {
   try {
-    // Get parameters from URL
-    const searchParams = request.nextUrl.searchParams;
-    const address = searchParams.get('address');
-    const contract = searchParams.get('contract');
-    const limit = parseInt(searchParams.get('limit') || '20', 10);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
-    const chain = (searchParams.get('chain') || 'BASE') as any;
-    const network = (searchParams.get('network') || 'SEPOLIA') as any;
+    const url = `${NODIT_API_BASE}/token/contracts/metadata?contract_addresses=${CONTRACT_ADDRESSES.distribution},${CONTRACT_ADDRESSES.escrow}&chain_id=${CHAIN_ID}`;
     
-    if (!address && !contract) {
-      return NextResponse.json(
-        { error: 'Either address or contract parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    let transfers: any[] = [];
-    let totalCount = 0;
-    
-    // Handle fetching by account or by contract
-    if (address) {
-      // Fetch token transfers for an account
-      const transferData = await NoditAPI.web3Data.TokenApi.getTransfersByAccount(
-        address,
-        { limit, offset },
-        chain, 
-        network
-      );
-      transfers = transferData.transfers || [];
-      totalCount = transferData.total || transfers.length;
-    } else if (contract) {
-      // Fetch token transfers for a contract
-      const transferData = await NoditAPI.web3Data.TokenApi.getTransfersByContract(
-        contract as string,
-        { limit, offset },
-        chain,
-        network
-      );
-      transfers = transferData.transfers || [];
-      totalCount = transferData.total || transfers.length;
-    }
-
-    // Get token contract metadata for all unique tokens
-    const tokenContracts = Array.from(new Set(transfers.map(t => t.tokenAddress)));
-    let tokenMetadata: Record<string, any> = {};
-    
-    if (tokenContracts.length > 0) {
-      try {
-        const metadata = await NoditAPI.web3Data.TokenApi.getContractMetadata(
-          tokenContracts,
-          chain,
-          network
-        );
-        
-        // Create lookup object by contract address
-        if (metadata && metadata.tokens) {
-          tokenMetadata = metadata.tokens.reduce((acc: Record<string, any>, token: any) => {
-            acc[token.address] = token;
-            return acc;
-          }, {});
-        }
-      } catch (error) {
-        console.error('Error fetching token metadata:', error);
-      }
-    }
-    
-    // Enhance transfers with token data and formatting
-    const enhancedTransfers = transfers.map(transfer => {
-      const token = (tokenMetadata[transfer.tokenAddress] || {}) as Record<string, any>;
-      const decimals = token.decimals || 18;
-      
-      // Calculate token amount in human-readable form
-      const rawAmount = BigInt(transfer.value || '0');
-      const tokenAmount = Number(rawAmount) / Math.pow(10, decimals);
-      
-      return {
-        ...transfer,
-        formattedFrom: formatAddress(transfer.from),
-        formattedTo: formatAddress(transfer.to),
-        token: {
-          address: transfer.tokenAddress,
-          symbol: token.symbol || 'UNKNOWN',
-          name: token.name || 'Unknown Token',
-          decimals,
-          logoUrl: token.logo || null
-        },
-        amount: {
-          raw: transfer.value,
-          formatted: tokenAmount
-        },
-        timestamp: transfer.timestamp || transfer.blockTimestamp,
-        blockNumber: parseInt(transfer.blockNumber || '0', 16)
-      };
+    const response = await axios.get(url, {
+      headers: {
+        "x-api-key": NODIT_API_KEY,
+      },
     });
 
     return NextResponse.json({
-      transfers: enhancedTransfers,
-      total: totalCount,
-      limit,
-      offset,
-      chain,
-      network,
-      query: { address, contract }
-    });
+      success: true,
+      data: response.data,
+    }, { status: 200 });
   } catch (error) {
-    console.error('Error in token transfers API:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch token transfers' },
-      { status: 500 }
-    );
+    console.error("Error fetching metadata:", error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }, { status: 500 });
   }
-} 
+}
+
+// POST: Log webhook events
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { webhook_id, event_type, data } = body;
+
+    // Validate request body
+    if (!webhook_id || !event_type || !data) {
+      return NextResponse.json({
+        success: false,
+        error: "Missing required fields: webhook_id, event_type, or data",
+      }, { status: 400 });
+    }
+
+    // Supported event types from your contracts
+    const validEventTypes = [
+      "token_distribution",
+      "stake",
+      "deposit",
+      "released",
+      "refunded",
+      "phase_completed",
+      "metal_tokens_distributed",
+    ];
+
+    if (!validEventTypes.includes(event_type)) {
+      return NextResponse.json({
+        success: false,
+        error: `Invalid event_type. Must be one of: ${validEventTypes.join(", ")}`,
+      }, { status: 400 });
+    }
+
+    const url = `${NODIT_API_BASE}/webhook/log`;
+    const payload = {
+      webhook_id,
+      event_type,
+      data: {
+        ...data,
+        contract_address: data.contract_address || CONTRACT_ADDRESSES[event_type === "deposit" ? "escrow" : "distribution"],
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    const response = await axios.post(url, payload, {
+      headers: {
+        "x-api-key": NODIT_API_KEY,
+        "Content-Type": "application/json",
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: response.data,
+    }, { status: 200 });
+  } catch (error) {
+    console.error("Error logging webhook:", error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }, { status: 500 });
+  }
+}
